@@ -1,0 +1,120 @@
+---
+title: "Rshiny"
+author: "Yannick NGONO FONE"
+date: "2023-07-24"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE, warning=false}
+library("readr")
+library("rnaturalearth")
+library("rnaturalearthdata")
+library("leaflet")
+library("sp")
+library("sf")
+library("ggplot2")
+library("dplyr")
+library("shiny")
+library("plotly")
+library("rnaturalearthdata")
+library("mapdata")
+base <- read_csv("ACLED-Western_Africa.csv", show_col_types = FALSE)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# sn<-st_read("données_SEN/gadm36_SEN_1.shp")
+# projet_map <- st_as_sf(base, coords = c("longitude", "latitude"), crs = st_crs(sn))
+# projet_map<-st_join(projet_map,sn)
+```
+
+
+
+```{r eruptions, echo=FALSE}
+ne_countries_data <- ne_countries(scale = "medium", continent = "Africa")
+west_africa <- subset(ne_countries_data, subregion == "Western Africa")
+```
+
+
+```{r eruptions, echo=FALSE}
+ui <- fluidPage(
+  # titre de l'application
+  titlePanel("Yannick_shiny map"),
+  sidebarLayout(
+    sidebarPanel(            #creation de la barre latérale
+      selectInput(            #cration de l'espace qui abritera la selection dupays
+        inputId = "pays",
+        label = "Sélectionnez unou plusieurs pays",
+        choices = c(unique(base$pays)),
+        selected = c(unique(base$pays))[sample(1:length(unique(base$pays)), 1)],
+        multiple = TRUE),
+      selectInput(              #creation de l'espace qui abritera la selection du type d'évènement
+        inputId = "evenement",
+        label = "Sélectionnez un OU plusieurs Evenement(s)",
+        choices = c(unique(base$type)),
+        selected = "Protests",
+        multiple = TRUE
+      
+      ),
+      selectInput(                  #cration de l'espace qui abritera la selection de l'année
+        inputId = "annee",
+        label = "Sélectionnez une annee",
+        choices = c(unique(base$annee)),
+        selected = "2023",
+        multiple = TRUE
+      ),
+      actionButton(inputId = "valider", label = "Valider")   # creation du bouton "valider" qui permet d'actualiser la carte en fonctions entrées du l'utilisateur
+      
+
+    ),
+   
+    mainPanel(
+      leafletOutput(outputId = "map", width = "100%", height = "720px")
+    )# reserve l'espace pour l'affichage de graphique
+  )
+)
+
+
+```
+
+
+```{r}
+server <- function(input, output, session) {
+  filtered_data <- eventReactive(input$valider, {
+    subset(base, pays %in% input$pays & type %in% input$evenement & annee %in% input$annee)
+  }) # filtrer les données à travers les choix de l'utilateur
+  
+  output$map <- renderLeaflet({   #construction de la carte map avec leaflet
+    filtered_west_africa <- west_africa[west_africa$name %in% input$pays] 
+    
+    # permet de Définir une palette de couleurs pour les différents types d'événements
+    couleur_evenements <- colorFactor(c("red", "blue", "green", "purple", "orange", "yellow"), levels = unique(base$type))
+    
+    leaflet() %>%
+      addProviderTiles(providers$Stamen.Toner) %>%
+      addPolygons(data = ne_countries(type = "countries", country = input$pays), fillColor = "cornflowerblue", color ="gray" , fillOpacity = 0.4) %>%
+ 
+    
+      addCircleMarkers(data = filtered_data(), #prends les coordonner à representer ainsi que les paramètrere qui donnerons son apparence à la carte
+                       lat = ~latitude,
+                       lng = ~longitude,
+                       radius = 3,
+                       opacity = 0.5,
+                       color = ~couleur_evenements(type))
+  })
+}
+
+```
+
+
+```{r}
+# Rendu de l'application
+shinyApp(ui = ui, server = server)
+
+```
+
+
+
+
